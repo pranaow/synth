@@ -450,6 +450,8 @@
         ensureAudio();
         setOscFreq(freq);
         updateFreqDisplay(freq);
+        freqSlider.value = Math.min(freq, 2000);
+        freqInput.value = Math.round(freq);
       } else if (playButtonOn) {
         const freq = getSliderFreq();
         ensureAudio();
