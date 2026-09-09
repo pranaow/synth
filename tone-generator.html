@@ -249,6 +249,40 @@
     }
 
     .key.white.active .key-note { color: #ede9fe; }
+
+    /* ── Octave shift ── */
+    .octave-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .octave-row label {
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #555;
+    }
+
+    .octave-slider-wrap {
+      display: flex;
+      flex-direction: column;
+      width: 200px;
+      gap: 0.2rem;
+    }
+
+    #octaveSlider { width: 100%; }
+
+    .octave-ticks {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: #555;
+      padding: 0 6px;
+    }
+
+    .octave-ticks span.active-tick { color: #7c3aed; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -292,6 +326,17 @@
   </div>
 
   <div class="keyboard-section">
+    <div class="octave-row">
+      <label>Octave Shift</label>
+      <div class="octave-slider-wrap">
+        <input type="range" id="octaveSlider" min="-1" max="1" step="1" value="0">
+        <div class="octave-ticks">
+          <span id="tick-1">Oct -1</span>
+          <span id="tick0" class="active-tick">Normal</span>
+          <span id="tick1">Oct +1</span>
+        </div>
+      </div>
+    </div>
     <div class="keyboard" id="keyboard"></div>
     <div class="keyboard-hint">Z–M &amp; Q–I · sharps: S D G H J &amp; 2 3 5 6 7</div>
   </div>
@@ -339,6 +384,7 @@
     let currentFreq  = 440;
 
     const activeKeys = new Map(); // key char → note (preserves insertion order)
+    let octaveShift = 0;
 
     // ── DOM ──
     const freqSlider  = document.getElementById('freqSlider');
@@ -355,6 +401,8 @@
     // ── Helpers ──
     function getSliderFreq() { return parseFloat(freqInput.value) || 440; }
     function getVolume()     { return parseInt(volSlider.value) / 100; }
+    function shiftedFreq(note) { return note.freq * Math.pow(2, octaveShift); }
+    function shiftedLabel(label) { return label.replace(/(\d+)$/, n => parseInt(n) + octaveShift); }
 
     function updateFreqDisplay(freq) {
       currentFreq = freq;
@@ -398,9 +446,10 @@
 
       if (keyStack.length > 0) {
         const note = keyStack[keyStack.length - 1]; // last pressed = highest priority
+        const freq = shiftedFreq(note);
         ensureAudio();
-        setOscFreq(note.freq);
-        updateFreqDisplay(note.freq);
+        setOscFreq(freq);
+        updateFreqDisplay(freq);
       } else if (playButtonOn) {
         const freq = getSliderFreq();
         ensureAudio();
@@ -457,6 +506,26 @@
 
     btnSine.addEventListener('click', () => setWaveType('sine'));
     btnSquare.addEventListener('click', () => setWaveType('square'));
+
+    document.getElementById('octaveSlider').addEventListener('input', function () {
+      octaveShift = parseInt(this.value);
+
+      // Update tick highlight
+      ['tick-1', 'tick0', 'tick1'].forEach((id, i) => {
+        document.getElementById(id).classList.toggle('active-tick', i - 1 === octaveShift);
+      });
+
+      // Update key labels
+      NOTES.forEach(n => {
+        if (n.type === 'white') {
+          const el = keyEl(n.id)?.querySelector('.key-note');
+          if (el) el.textContent = shiftedLabel(n.label);
+        }
+      });
+
+      // Re-pitch any currently held keys immediately
+      updateTone();
+    });
 
     // ── Waveform drawing ──
     function getCycles() { return Math.max(0.5, currentFreq * 0.02); }
