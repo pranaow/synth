@@ -5,11 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tone Generator</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -20,6 +16,7 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
+      padding: 2rem 1rem;
       gap: 2rem;
     }
 
@@ -82,9 +79,7 @@
       transition: background 0.2s;
     }
 
-    input[type="range"]::-webkit-slider-thumb:hover {
-      background: #9d5cf6;
-    }
+    input[type="range"]::-webkit-slider-thumb:hover { background: #9d5cf6; }
 
     input[type="number"] {
       width: 90px;
@@ -99,9 +94,7 @@
       transition: border-color 0.2s;
     }
 
-    input[type="number"]:focus {
-      border-color: #7c3aed;
-    }
+    input[type="number"]:focus { border-color: #7c3aed; }
 
     .freq-display {
       text-align: center;
@@ -125,10 +118,7 @@
       display: block;
     }
 
-    .controls {
-      display: flex;
-      gap: 1rem;
-    }
+    .controls { display: flex; gap: 1rem; }
 
     button {
       flex: 1;
@@ -143,32 +133,14 @@
       transition: opacity 0.2s, transform 0.1s;
     }
 
-    button:active {
-      transform: scale(0.97);
-    }
+    button:active { transform: scale(0.97); }
 
-    #playBtn {
-      background: #7c3aed;
-      color: #fff;
-    }
+    #playBtn { background: #7c3aed; color: #fff; }
+    #playBtn:hover { opacity: 0.85; }
+    #playBtn.playing { background: #ef4444; }
 
-    #playBtn:hover {
-      opacity: 0.85;
-    }
-
-    #playBtn.playing {
-      background: #ef4444;
-    }
-
-    .volume-row {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .volume-row input[type="range"] {
-      flex: 1;
-    }
+    .volume-row { display: flex; align-items: center; gap: 1rem; }
+    .volume-row input[type="range"] { flex: 1; }
 
     .vol-label {
       font-size: 0.85rem;
@@ -200,18 +172,83 @@
       transform: none;
     }
 
-    .wave-toggle button:active {
-      transform: none;
+    .wave-toggle button:active { transform: none; }
+    .wave-toggle button.active { background: #7c3aed; color: #fff; }
+    .wave-toggle button:not(.active):hover { color: #ccc; }
+
+    /* ── Keyboard ── */
+    .keyboard-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
     }
 
-    .wave-toggle button.active {
-      background: #7c3aed;
-      color: #fff;
+    .keyboard-hint {
+      font-size: 0.72rem;
+      color: #555;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
-    .wave-toggle button:not(.active):hover {
-      color: #ccc;
+    .keyboard {
+      position: relative;
+      user-select: none;
     }
+
+    .key {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-bottom: 6px;
+      cursor: pointer;
+      border-radius: 0 0 5px 5px;
+    }
+
+    .key.white {
+      background: #ddd;
+      border: 1px solid #888;
+      border-top: none;
+      z-index: 1;
+      transition: background 0.05s;
+    }
+
+    .key.white:hover { background: #ccc8f8; }
+    .key.white.active { background: #a78bfa; }
+
+    .key.black {
+      background: #1c1c1c;
+      border: 1px solid #000;
+      border-top: none;
+      z-index: 2;
+      transition: background 0.05s;
+    }
+
+    .key.black:hover { background: #333; }
+    .key.black.active { background: #7c3aed; }
+
+    .key-shortcut {
+      font-size: 10px;
+      font-weight: 700;
+      color: #777;
+      line-height: 1;
+    }
+
+    .key.white.active .key-shortcut,
+    .key.black.active .key-shortcut { color: #fff; }
+
+    .key.black .key-shortcut { color: #999; font-size: 9px; }
+
+    .key-note {
+      font-size: 8px;
+      color: #aaa;
+      margin-top: 2px;
+      line-height: 1;
+    }
+
+    .key.white.active .key-note { color: #ede9fe; }
   </style>
 </head>
 <body>
@@ -254,55 +291,160 @@
     </div>
   </div>
 
+  <div class="keyboard-section">
+    <div class="keyboard" id="keyboard"></div>
+    <div class="keyboard-hint">Z–M &amp; Q–I · sharps: S D G H J &amp; 2 3 5 6 7</div>
+  </div>
+
   <script>
-    let audioCtx = null;
+    // ── Note table ──
+    const NOTES = [
+      { id: 'C4',  freq: 261.63,  type: 'white', key: 'z', label: 'C4'  },
+      { id: 'Cs4', freq: 277.18,  type: 'black', key: 's', label: 'C#4' },
+      { id: 'D4',  freq: 293.66,  type: 'white', key: 'x', label: 'D4'  },
+      { id: 'Ds4', freq: 311.13,  type: 'black', key: 'd', label: 'D#4' },
+      { id: 'E4',  freq: 329.63,  type: 'white', key: 'c', label: 'E4'  },
+      { id: 'F4',  freq: 349.23,  type: 'white', key: 'v', label: 'F4'  },
+      { id: 'Fs4', freq: 369.99,  type: 'black', key: 'g', label: 'F#4' },
+      { id: 'G4',  freq: 392.00,  type: 'white', key: 'b', label: 'G4'  },
+      { id: 'Gs4', freq: 415.30,  type: 'black', key: 'h', label: 'G#4' },
+      { id: 'A4',  freq: 440.00,  type: 'white', key: 'n', label: 'A4'  },
+      { id: 'As4', freq: 466.16,  type: 'black', key: 'j', label: 'A#4' },
+      { id: 'B4',  freq: 493.88,  type: 'white', key: 'm', label: 'B4'  },
+      { id: 'C5',  freq: 523.25,  type: 'white', key: 'q', label: 'C5'  },
+      { id: 'Cs5', freq: 554.37,  type: 'black', key: '2', label: 'C#5' },
+      { id: 'D5',  freq: 587.33,  type: 'white', key: 'w', label: 'D5'  },
+      { id: 'Ds5', freq: 622.25,  type: 'black', key: '3', label: 'D#5' },
+      { id: 'E5',  freq: 659.25,  type: 'white', key: 'e', label: 'E5'  },
+      { id: 'F5',  freq: 698.46,  type: 'white', key: 'r', label: 'F5'  },
+      { id: 'Fs5', freq: 739.99,  type: 'black', key: '5', label: 'F#5' },
+      { id: 'G5',  freq: 783.99,  type: 'white', key: 't', label: 'G5'  },
+      { id: 'Gs5', freq: 830.61,  type: 'black', key: '6', label: 'G#5' },
+      { id: 'A5',  freq: 880.00,  type: 'white', key: 'y', label: 'A5'  },
+      { id: 'As5', freq: 932.33,  type: 'black', key: '7', label: 'A#5' },
+      { id: 'B5',  freq: 987.77,  type: 'white', key: 'u', label: 'B5'  },
+      { id: 'C6',  freq: 1046.50, type: 'white', key: 'i', label: 'C6'  },
+    ];
+
+    const keyToNote = Object.fromEntries(NOTES.map(n => [n.key, n]));
+
+    // ── Audio state ──
+    let audioCtx   = null;
     let oscillator = null;
-    let gainNode = null;
+    let gainNode   = null;
     let animFrameId = null;
-    let playing = false;
-    let waveType = 'sine';
+    let playing    = false;
+    let waveType   = 'sine';
+    let playButtonOn = false;
+    let currentFreq  = 440;
 
-    const freqSlider = document.getElementById('freqSlider');
-    const freqInput = document.getElementById('freqInput');
+    const activeKeys = new Map(); // key char → note (preserves insertion order)
+
+    // ── DOM ──
+    const freqSlider  = document.getElementById('freqSlider');
+    const freqInput   = document.getElementById('freqInput');
     const freqDisplay = document.getElementById('freqDisplay');
-    const volSlider = document.getElementById('volSlider');
-    const volDisplay = document.getElementById('volDisplay');
-    const playBtn = document.getElementById('playBtn');
-    const btnSine = document.getElementById('btnSine');
-    const btnSquare = document.getElementById('btnSquare');
-    const canvas = document.getElementById('scope');
-    const ctx = canvas.getContext('2d');
+    const volSlider   = document.getElementById('volSlider');
+    const volDisplay  = document.getElementById('volDisplay');
+    const playBtn     = document.getElementById('playBtn');
+    const btnSine     = document.getElementById('btnSine');
+    const btnSquare   = document.getElementById('btnSquare');
+    const canvas      = document.getElementById('scope');
+    const ctx         = canvas.getContext('2d');
 
-    function getFreq() {
-      return parseFloat(freqInput.value) || 440;
+    // ── Helpers ──
+    function getSliderFreq() { return parseFloat(freqInput.value) || 440; }
+    function getVolume()     { return parseInt(volSlider.value) / 100; }
+
+    function updateFreqDisplay(freq) {
+      currentFreq = freq;
+      freqDisplay.innerHTML = `${Math.round(freq * 10) / 10} <span>Hz</span>`;
     }
 
-    function getVolume() {
-      return parseInt(volSlider.value) / 100;
+    // ── Audio engine ──
+    function ensureAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = getVolume();
+      gainNode.connect(audioCtx.destination);
+      oscillator = audioCtx.createOscillator();
+      oscillator.type = waveType;
+      oscillator.frequency.value = currentFreq;
+      oscillator.connect(gainNode);
+      oscillator.start();
+      playing = true;
     }
 
-    function updateFreqDisplay(val) {
-      freqDisplay.innerHTML = `${val} <span>Hz</span>`;
+    function teardownAudio() {
+      if (!audioCtx) return;
+      oscillator.stop();
+      oscillator.disconnect();
+      gainNode.disconnect();
+      audioCtx.close();
+      oscillator = null;
+      gainNode   = null;
+      audioCtx   = null;
+      playing    = false;
     }
 
+    function setOscFreq(freq) {
+      if (oscillator) oscillator.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.005);
+    }
+
+    // Central function: decides what the oscillator should do based on all inputs
+    function updateTone() {
+      const keyStack = [...activeKeys.values()];
+
+      if (keyStack.length > 0) {
+        const note = keyStack[keyStack.length - 1]; // last pressed = highest priority
+        ensureAudio();
+        setOscFreq(note.freq);
+        updateFreqDisplay(note.freq);
+      } else if (playButtonOn) {
+        const freq = getSliderFreq();
+        ensureAudio();
+        setOscFreq(freq);
+        updateFreqDisplay(freq);
+      } else {
+        teardownAudio();
+      }
+
+      // Sync animation loop with playing state
+      if (playing && !animFrameId) drawScope();
+      if (!playing && animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+        drawStatic();
+      }
+    }
+
+    // ── Controls ──
     freqSlider.addEventListener('input', () => {
       freqInput.value = freqSlider.value;
-      updateFreqDisplay(freqSlider.value);
-      if (oscillator) oscillator.frequency.setTargetAtTime(getFreq(), audioCtx.currentTime, 0.01);
+      updateFreqDisplay(+freqSlider.value);
+      if (playButtonOn && activeKeys.size === 0) setOscFreq(getSliderFreq());
       if (!playing) drawStatic();
     });
 
     freqInput.addEventListener('input', () => {
       const val = Math.min(Math.max(parseInt(freqInput.value) || 20, 20), 20000);
       freqSlider.value = Math.min(val, 2000);
-      updateFreqDisplay(freqInput.value);
-      if (oscillator) oscillator.frequency.setTargetAtTime(getFreq(), audioCtx.currentTime, 0.01);
+      updateFreqDisplay(val);
+      if (playButtonOn && activeKeys.size === 0) setOscFreq(getSliderFreq());
       if (!playing) drawStatic();
     });
 
     volSlider.addEventListener('input', () => {
       volDisplay.textContent = volSlider.value + '%';
       if (gainNode) gainNode.gain.setTargetAtTime(getVolume(), audioCtx.currentTime, 0.01);
+    });
+
+    playBtn.addEventListener('click', () => {
+      playButtonOn = !playButtonOn;
+      playBtn.textContent = playButtonOn ? 'Stop' : 'Play';
+      playBtn.classList.toggle('playing', playButtonOn);
+      updateTone();
     });
 
     function setWaveType(type) {
@@ -316,97 +458,120 @@
     btnSine.addEventListener('click', () => setWaveType('sine'));
     btnSquare.addEventListener('click', () => setWaveType('square'));
 
-    playBtn.addEventListener('click', () => {
-      if (playing) {
-        stop();
-      } else {
-        start();
-      }
-    });
+    // ── Waveform drawing ──
+    function getCycles() { return Math.max(0.5, currentFreq * 0.02); }
 
-    function start() {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function sineY(angle, h)   { return h / 2 + (h / 2 - 12) * Math.sin(angle); }
+    function squareY(angle, h) { return h / 2 - (h / 2 - 12) * (Math.sin(angle) >= 0 ? 1 : -1); }
 
-      gainNode = audioCtx.createGain();
-      gainNode.gain.value = getVolume();
-
-      oscillator = audioCtx.createOscillator();
-      oscillator.type = waveType;
-      oscillator.frequency.value = getFreq();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      oscillator.start();
-
-      playing = true;
-      playBtn.textContent = 'Stop';
-      playBtn.classList.add('playing');
-      drawScope();
-    }
-
-    function stop() {
-      oscillator.stop();
-      oscillator.disconnect();
-      gainNode.disconnect();
-      audioCtx.close();
-      oscillator = null;
-      gainNode = null;
-      audioCtx = null;
-
-      playing = false;
-      playBtn.textContent = 'Play';
-      playBtn.classList.remove('playing');
-      cancelAnimationFrame(animFrameId);
-      drawStatic();
-    }
-
-    function sineY(angle, h) {
-      return h / 2 + (h / 2 - 12) * Math.sin(angle);
-    }
-
-    function squareY(angle, h) {
-      const amp = h / 2 - 12;
-      return h / 2 - amp * (Math.sin(angle) >= 0 ? 1 : -1);
-    }
-
-    function tracePath(color, getAngle, getY) {
-      const w = canvas.width;
-      const h = canvas.height;
-
+    function tracePath(color, getY) {
+      const w = canvas.width, h = canvas.height;
+      const cycles = getCycles();
       ctx.fillStyle = '#111';
       ctx.fillRect(0, 0, w, h);
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.beginPath();
       for (let i = 0; i <= w; i++) {
-        const angle = getAngle(i, w);
+        const angle = 2 * Math.PI * cycles * (i / w);
         const y = getY(angle, h);
         i === 0 ? ctx.moveTo(i, y) : ctx.lineTo(i, y);
       }
       ctx.stroke();
     }
 
-    function getCycles() {
-      // show ~20ms of signal so wavelength scales with frequency
-      return Math.max(0.5, getFreq() * 0.02);
-    }
-
-    function drawStatic() {
-      const cycles = getCycles();
-      const getAngle = (i, w) => 2 * Math.PI * cycles * (i / w);
-      const getY = waveType === 'square' ? squareY : sineY;
-      tracePath('#333', getAngle, getY);
-    }
-
-    function drawScope() {
+    function getWaveY() { return waveType === 'square' ? squareY : sineY; }
+    function drawStatic() { tracePath('#333', getWaveY()); }
+    function drawScope()  {
       animFrameId = requestAnimationFrame(drawScope);
-
-      const cycles = getCycles();
-      const getAngle = (i, w) => 2 * Math.PI * cycles * (i / w);
-      const getY = waveType === 'square' ? squareY : sineY;
-      tracePath('#7c3aed', getAngle, getY);
+      tracePath('#7c3aed', getWaveY());
     }
 
+    // ── Keyboard UI ──
+    const WKW = 42, WKH = 130, BKW = 26, BKH = 80;
+
+    function buildKeyboard() {
+      const kb = document.getElementById('keyboard');
+      kb.style.height = WKH + 'px';
+
+      let whiteIdx = 0;
+
+      NOTES.forEach(note => {
+        const el = document.createElement('div');
+        el.className = `key ${note.type}`;
+        el.dataset.id = note.id;
+
+        if (note.type === 'white') {
+          el.style.cssText = `left:${whiteIdx * WKW}px; top:0; width:${WKW}px; height:${WKH}px;`;
+
+          const noteSpan = document.createElement('span');
+          noteSpan.className = 'key-note';
+          noteSpan.textContent = note.label;
+
+          const kbSpan = document.createElement('span');
+          kbSpan.className = 'key-shortcut';
+          kbSpan.textContent = note.key.toUpperCase();
+
+          el.appendChild(kbSpan);
+          el.appendChild(noteSpan);
+          whiteIdx++;
+        } else {
+          // Center black key over the border between adjacent white keys
+          const left = (whiteIdx - 1 + 0.67) * WKW - BKW / 2;
+          el.style.cssText = `left:${left}px; top:0; width:${BKW}px; height:${BKH}px;`;
+
+          const kbSpan = document.createElement('span');
+          kbSpan.className = 'key-shortcut';
+          kbSpan.textContent = note.key.toUpperCase();
+          el.appendChild(kbSpan);
+        }
+
+        el.addEventListener('mousedown', e => { e.preventDefault(); pressNote(note); mouseNote = note; });
+        kb.appendChild(el);
+      });
+
+      kb.style.width = (whiteIdx * WKW) + 'px';
+    }
+
+    let mouseNote = null;
+
+    document.addEventListener('mouseup', () => {
+      if (mouseNote) { releaseNote(mouseNote); mouseNote = null; }
+    });
+
+    function keyEl(id) { return document.querySelector(`.key[data-id="${id}"]`); }
+
+    function pressNote(note) {
+      if (activeKeys.has(note.key)) return;
+      activeKeys.set(note.key, note);
+      keyEl(note.id)?.classList.add('active');
+      updateTone();
+    }
+
+    function releaseNote(note) {
+      if (!activeKeys.has(note.key)) return;
+      activeKeys.delete(note.key);
+      keyEl(note.id)?.classList.remove('active');
+      updateTone();
+    }
+
+    // ── Keyboard events ──
+    document.addEventListener('keydown', e => {
+      if (e.repeat) return;
+      const note = keyToNote[e.key.toLowerCase()];
+      if (!note) return;
+      e.preventDefault();
+      pressNote(note);
+    });
+
+    document.addEventListener('keyup', e => {
+      const note = keyToNote[e.key.toLowerCase()];
+      if (!note) return;
+      releaseNote(note);
+    });
+
+    // ── Init ──
+    buildKeyboard();
     drawStatic();
   </script>
 </body>
