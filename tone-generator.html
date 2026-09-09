@@ -395,8 +395,7 @@
       animFrameId = requestAnimationFrame(drawScope);
 
       const cycles = 3;
-      const t = audioCtx.currentTime;
-      const getAngle = (i, w) => 2 * Math.PI * (cycles * (i / w) - t);
+      const getAngle = (i, w) => 2 * Math.PI * cycles * (i / w);
       const getY = waveType === 'square' ? squareY : sineY;
       tracePath('#7c3aed', getAngle, getY);
     }
