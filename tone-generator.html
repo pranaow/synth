@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sine Wave Tone Generator</title>
+  <title>Tone Generator</title>
   <style>
     * {
       margin: 0;
@@ -176,6 +176,42 @@
       min-width: 36px;
       text-align: right;
     }
+
+    .wave-toggle {
+      display: flex;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .wave-toggle button {
+      flex: 1;
+      padding: 0.5rem;
+      border-radius: 7px;
+      background: transparent;
+      color: #666;
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      transform: none;
+    }
+
+    .wave-toggle button:active {
+      transform: none;
+    }
+
+    .wave-toggle button.active {
+      background: #7c3aed;
+      color: #fff;
+    }
+
+    .wave-toggle button:not(.active):hover {
+      color: #ccc;
+    }
   </style>
 </head>
 <body>
@@ -201,6 +237,14 @@
     </div>
 
     <div class="field">
+      <label>Wave Type</label>
+      <div class="wave-toggle">
+        <button id="btnSine" class="active">Sine</button>
+        <button id="btnSquare">Square</button>
+      </div>
+    </div>
+
+    <div class="field">
       <label>Waveform</label>
       <canvas id="scope" width="330" height="100"></canvas>
     </div>
@@ -215,8 +259,8 @@
     let oscillator = null;
     let gainNode = null;
     let animFrameId = null;
-    let analyser = null;
     let playing = false;
+    let waveType = 'sine';
 
     const freqSlider = document.getElementById('freqSlider');
     const freqInput = document.getElementById('freqInput');
@@ -224,6 +268,8 @@
     const volSlider = document.getElementById('volSlider');
     const volDisplay = document.getElementById('volDisplay');
     const playBtn = document.getElementById('playBtn');
+    const btnSine = document.getElementById('btnSine');
+    const btnSquare = document.getElementById('btnSquare');
     const canvas = document.getElementById('scope');
     const ctx = canvas.getContext('2d');
 
@@ -257,6 +303,17 @@
       if (gainNode) gainNode.gain.setTargetAtTime(getVolume(), audioCtx.currentTime, 0.01);
     });
 
+    function setWaveType(type) {
+      waveType = type;
+      btnSine.classList.toggle('active', type === 'sine');
+      btnSquare.classList.toggle('active', type === 'square');
+      if (oscillator) oscillator.type = type;
+      if (!playing) drawStatic();
+    }
+
+    btnSine.addEventListener('click', () => setWaveType('sine'));
+    btnSquare.addEventListener('click', () => setWaveType('square'));
+
     playBtn.addEventListener('click', () => {
       if (playing) {
         stop();
@@ -267,18 +324,15 @@
 
     function start() {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 1024;
 
       gainNode = audioCtx.createGain();
       gainNode.gain.value = getVolume();
 
       oscillator = audioCtx.createOscillator();
-      oscillator.type = 'sine';
+      oscillator.type = waveType;
       oscillator.frequency.value = getFreq();
 
-      oscillator.connect(analyser);
-      analyser.connect(gainNode);
+      oscillator.connect(gainNode);
       gainNode.connect(audioCtx.destination);
       oscillator.start();
 
@@ -295,51 +349,59 @@
       audioCtx.close();
       oscillator = null;
       gainNode = null;
-      analyser = null;
       audioCtx = null;
 
       playing = false;
       playBtn.textContent = 'Play';
       playBtn.classList.remove('playing');
       cancelAnimationFrame(animFrameId);
-      clearCanvas();
+      drawStatic();
     }
 
-    function clearCanvas() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#111';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    function sineY(angle, h) {
+      return h / 2 + (h / 2 - 12) * Math.sin(angle);
     }
 
-    function drawScope() {
-      animFrameId = requestAnimationFrame(drawScope);
+    function squareY(angle, h) {
+      const amp = h / 2 - 12;
+      return h / 2 - amp * (Math.sin(angle) >= 0 ? 1 : -1);
+    }
 
-      const bufferLength = analyser.fftSize;
-      const dataArray = new Float32Array(bufferLength);
-      analyser.getFloatTimeDomainData(dataArray);
-
+    function tracePath(color, getAngle, getY) {
       const w = canvas.width;
       const h = canvas.height;
 
       ctx.fillStyle = '#111';
       ctx.fillRect(0, 0, w, h);
-
-      ctx.strokeStyle = '#7c3aed';
+      ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.beginPath();
-
-      const sliceWidth = w / bufferLength;
-      let x = 0;
-      for (let i = 0; i < bufferLength; i++) {
-        const y = (1 - (dataArray[i] + 1) / 2) * h;
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        x += sliceWidth;
+      for (let i = 0; i <= w; i++) {
+        const angle = getAngle(i, w);
+        const y = getY(angle, h);
+        i === 0 ? ctx.moveTo(i, y) : ctx.lineTo(i, y);
       }
-
       ctx.stroke();
     }
 
-    clearCanvas();
+    function drawStatic() {
+      const cycles = 3;
+      const getAngle = (i, w) => 2 * Math.PI * cycles * (i / w);
+      const getY = waveType === 'square' ? squareY : sineY;
+      tracePath('#333', getAngle, getY);
+    }
+
+    function drawScope() {
+      animFrameId = requestAnimationFrame(drawScope);
+
+      const cycles = 3;
+      const t = audioCtx.currentTime;
+      const getAngle = (i, w) => 2 * Math.PI * (cycles * (i / w) - t);
+      const getY = waveType === 'square' ? squareY : sineY;
+      tracePath('#7c3aed', getAngle, getY);
+    }
+
+    drawStatic();
   </script>
 </body>
 </html>
