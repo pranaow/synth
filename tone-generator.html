@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sine Wave Tone Generator</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 2rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      letter-spacing: 0.15em;
+      color: #7c3aed;
+      text-transform: uppercase;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 2.5rem;
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.8rem;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    label {
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #888;
+    }
+
+    .freq-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: #333;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #7c3aed;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #9d5cf6;
+    }
+
+    input[type="number"] {
+      width: 90px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 1rem;
+      padding: 0.4rem 0.6rem;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="number"]:focus {
+      border-color: #7c3aed;
+    }
+
+    .freq-display {
+      text-align: center;
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #7c3aed;
+      letter-spacing: 0.05em;
+    }
+
+    .freq-display span {
+      font-size: 1rem;
+      color: #888;
+      font-weight: 400;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100px;
+      border-radius: 8px;
+      background: #111;
+      display: block;
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+    }
+
+    button {
+      flex: 1;
+      padding: 0.85rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    #playBtn {
+      background: #7c3aed;
+      color: #fff;
+    }
+
+    #playBtn:hover {
+      opacity: 0.85;
+    }
+
+    #playBtn.playing {
+      background: #ef4444;
+    }
+
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .volume-row input[type="range"] {
+      flex: 1;
+    }
+
+    .vol-label {
+      font-size: 0.85rem;
+      color: #aaa;
+      min-width: 36px;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <h1>Tone Generator</h1>
+
+  <div class="card">
+    <div class="freq-display" id="freqDisplay">440 <span>Hz</span></div>
+
+    <div class="field">
+      <label>Frequency</label>
+      <div class="freq-row">
+        <input type="range" id="freqSlider" min="20" max="2000" value="440" step="1">
+        <input type="number" id="freqInput" min="20" max="20000" value="440">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Volume</label>
+      <div class="volume-row">
+        <input type="range" id="volSlider" min="0" max="100" value="50" step="1">
+        <span class="vol-label" id="volDisplay">50%</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Waveform</label>
+      <canvas id="scope" width="330" height="100"></canvas>
+    </div>
+
+    <div class="controls">
+      <button id="playBtn">Play</button>
+    </div>
+  </div>
+
+  <script>
+    let audioCtx = null;
+    let oscillator = null;
+    let gainNode = null;
+    let animFrameId = null;
+    let analyser = null;
+    let playing = false;
+
+    const freqSlider = document.getElementById('freqSlider');
+    const freqInput = document.getElementById('freqInput');
+    const freqDisplay = document.getElementById('freqDisplay');
+    const volSlider = document.getElementById('volSlider');
+    const volDisplay = document.getElementById('volDisplay');
+    const playBtn = document.getElementById('playBtn');
+    const canvas = document.getElementById('scope');
+    const ctx = canvas.getContext('2d');
+
+    function getFreq() {
+      return parseFloat(freqInput.value) || 440;
+    }
+
+    function getVolume() {
+      return parseInt(volSlider.value) / 100;
+    }
+
+    function updateFreqDisplay(val) {
+      freqDisplay.innerHTML = `${val} <span>Hz</span>`;
+    }
+
+    freqSlider.addEventListener('input', () => {
+      freqInput.value = freqSlider.value;
+      updateFreqDisplay(freqSlider.value);
+      if (oscillator) oscillator.frequency.setTargetAtTime(getFreq(), audioCtx.currentTime, 0.01);
+    });
+
+    freqInput.addEventListener('input', () => {
+      const val = Math.min(Math.max(parseInt(freqInput.value) || 20, 20), 20000);
+      freqSlider.value = Math.min(val, 2000);
+      updateFreqDisplay(freqInput.value);
+      if (oscillator) oscillator.frequency.setTargetAtTime(getFreq(), audioCtx.currentTime, 0.01);
+    });
+
+    volSlider.addEventListener('input', () => {
+      volDisplay.textContent = volSlider.value + '%';
+      if (gainNode) gainNode.gain.setTargetAtTime(getVolume(), audioCtx.currentTime, 0.01);
+    });
+
+    playBtn.addEventListener('click', () => {
+      if (playing) {
+        stop();
+      } else {
+        start();
+      }
+    });
+
+    function start() {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = getVolume();
+
+      oscillator = audioCtx.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = getFreq();
+
+      oscillator.connect(analyser);
+      analyser.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.start();
+
+      playing = true;
+      playBtn.textContent = 'Stop';
+      playBtn.classList.add('playing');
+      drawScope();
+    }
+
+    function stop() {
+      oscillator.stop();
+      oscillator.disconnect();
+      gainNode.disconnect();
+      audioCtx.close();
+      oscillator = null;
+      gainNode = null;
+      analyser = null;
+      audioCtx = null;
+
+      playing = false;
+      playBtn.textContent = 'Play';
+      playBtn.classList.remove('playing');
+      cancelAnimationFrame(animFrameId);
+      clearCanvas();
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function drawScope() {
+      animFrameId = requestAnimationFrame(drawScope);
+
+      const bufferLength = analyser.fftSize;
+      const dataArray = new Float32Array(bufferLength);
+      analyser.getFloatTimeDomainData(dataArray);
+
+      const w = canvas.width;
+      const h = canvas.height;
+
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = '#7c3aed';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      const sliceWidth = w / bufferLength;
+      let x = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const y = (1 - (dataArray[i] + 1) / 2) * h;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        x += sliceWidth;
+      }
+
+      ctx.stroke();
+    }
+
+    clearCanvas();
+  </script>
+</body>
+</html>
