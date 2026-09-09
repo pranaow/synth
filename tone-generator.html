@@ -289,6 +289,7 @@
       freqInput.value = freqSlider.value;
       updateFreqDisplay(freqSlider.value);
       if (oscillator) oscillator.frequency.setTargetAtTime(getFreq(), audioCtx.currentTime, 0.01);
+      if (!playing) drawStatic();
     });
 
     freqInput.addEventListener('input', () => {
@@ -296,6 +297,7 @@
       freqSlider.value = Math.min(val, 2000);
       updateFreqDisplay(freqInput.value);
       if (oscillator) oscillator.frequency.setTargetAtTime(getFreq(), audioCtx.currentTime, 0.01);
+      if (!playing) drawStatic();
     });
 
     volSlider.addEventListener('input', () => {
@@ -384,8 +386,13 @@
       ctx.stroke();
     }
 
+    function getCycles() {
+      // show ~20ms of signal so wavelength scales with frequency
+      return Math.max(0.5, getFreq() * 0.02);
+    }
+
     function drawStatic() {
-      const cycles = 3;
+      const cycles = getCycles();
       const getAngle = (i, w) => 2 * Math.PI * cycles * (i / w);
       const getY = waveType === 'square' ? squareY : sineY;
       tracePath('#333', getAngle, getY);
@@ -394,7 +401,7 @@
     function drawScope() {
       animFrameId = requestAnimationFrame(drawScope);
 
-      const cycles = 3;
+      const cycles = getCycles();
       const getAngle = (i, w) => 2 * Math.PI * cycles * (i / w);
       const getY = waveType === 'square' ? squareY : sineY;
       tracePath('#7c3aed', getAngle, getY);
