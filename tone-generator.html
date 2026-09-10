@@ -425,11 +425,13 @@
     <div class="octave-row">
       <label>Octave Shift</label>
       <div class="octave-slider-wrap">
-        <input type="range" id="octaveSlider" min="-1" max="1" step="1" value="0">
+        <input type="range" id="octaveSlider" min="-2" max="2" step="1" value="0">
         <div class="octave-ticks">
-          <span id="tick-1">Oct -1</span>
-          <span id="tick0" class="active-tick">Normal</span>
-          <span id="tick1">Oct +1</span>
+          <span id="tick-2">-2</span>
+          <span id="tick-1">-1</span>
+          <span id="tick0" class="active-tick">0</span>
+          <span id="tick1">+1</span>
+          <span id="tick2">+2</span>
         </div>
       </div>
     </div>
@@ -659,15 +661,16 @@
     btnSine.addEventListener('click', () => setWaveType('sine'));
     btnSquare.addEventListener('click', () => setWaveType('square'));
 
-    document.getElementById('octaveSlider').addEventListener('input', function () {
-      octaveShift = parseInt(this.value);
+    const octaveSliderEl = document.getElementById('octaveSlider');
 
-      // Update tick highlight
-      ['tick-1', 'tick0', 'tick1'].forEach((id, i) => {
-        document.getElementById(id).classList.toggle('active-tick', i - 1 === octaveShift);
+    function applyOctaveShift(value) {
+      octaveShift = Math.max(-2, Math.min(2, value));
+      octaveSliderEl.value = octaveShift;
+
+      ['tick-2', 'tick-1', 'tick0', 'tick1', 'tick2'].forEach((id, i) => {
+        document.getElementById(id).classList.toggle('active-tick', i - 2 === octaveShift);
       });
 
-      // Update key labels
       NOTES.forEach(n => {
         if (n.type === 'white') {
           const el = keyEl(n.id)?.querySelector('.key-note');
@@ -675,8 +678,11 @@
         }
       });
 
-      // Re-pitch any currently held keys immediately
       updateTone();
+    }
+
+    octaveSliderEl.addEventListener('input', function () {
+      applyOctaveShift(parseInt(this.value));
     });
 
     // ── Waveform drawing ──
@@ -799,6 +805,8 @@
     // ── Keyboard events ──
     document.addEventListener('keydown', e => {
       if (e.repeat) return;
+      if (e.key === '9') { e.preventDefault(); applyOctaveShift(octaveShift - 1); return; }
+      if (e.key === '0') { e.preventDefault(); applyOctaveShift(octaveShift + 1); return; }
       const note = keyToNote[e.key.toLowerCase()];
       if (!note) return;
       e.preventDefault();
