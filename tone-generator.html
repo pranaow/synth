@@ -368,8 +368,8 @@
         <div class="field">
           <label>Wave Type</label>
           <div class="wave-toggle">
-            <button id="btnSine" class="active">Sine</button>
-            <button id="btnSquare">Square</button>
+            <button id="btnSine">Sine</button>
+            <button id="btnSquare" class="active">Square</button>
           </div>
         </div>
       </div>
@@ -478,7 +478,7 @@
     let analyserBuf  = null;
     let animFrameId = null;
     let playing    = false;
-    let waveType   = 'sine';
+    let waveType   = 'square';
     let playButtonOn = false;
     let currentFreq  = 440;
 
