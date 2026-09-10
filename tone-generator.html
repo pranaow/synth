@@ -374,9 +374,11 @@
     const keyToNote = Object.fromEntries(NOTES.map(n => [n.key, n]));
 
     // ── Audio state ──
-    let audioCtx   = null;
-    let oscillator = null;
-    let gainNode   = null;
+    let audioCtx    = null;
+    let oscillator  = null;
+    let gainNode    = null;
+    let analyserNode = null;
+    let analyserBuf  = null;
     let animFrameId = null;
     let playing    = false;
     let waveType   = 'sine';
@@ -415,7 +417,11 @@
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       gainNode = audioCtx.createGain();
       gainNode.gain.value = getVolume();
-      gainNode.connect(audioCtx.destination);
+      analyserNode = audioCtx.createAnalyser();
+      analyserNode.fftSize = 8192;
+      analyserBuf = new Uint8Array(analyserNode.fftSize);
+      gainNode.connect(analyserNode);
+      analyserNode.connect(audioCtx.destination);
       oscillator = audioCtx.createOscillator();
       oscillator.type = waveType;
       oscillator.frequency.value = currentFreq;
@@ -429,11 +435,14 @@
       oscillator.stop();
       oscillator.disconnect();
       gainNode.disconnect();
+      analyserNode.disconnect();
       audioCtx.close();
-      oscillator = null;
-      gainNode   = null;
-      audioCtx   = null;
-      playing    = false;
+      oscillator   = null;
+      gainNode     = null;
+      analyserNode = null;
+      analyserBuf  = null;
+      audioCtx     = null;
+      playing      = false;
     }
 
     function setOscFreq(freq) {
@@ -530,32 +539,52 @@
     });
 
     // ── Waveform drawing ──
-    function getCycles() { return Math.max(0.5, currentFreq * 0.02); }
-
-    function sineY(angle, h)   { return h / 2 + (h / 2 - 12) * Math.sin(angle); }
-    function squareY(angle, h) { return h / 2 - (h / 2 - 12) * (Math.sin(angle) >= 0 ? 1 : -1); }
-
-    function tracePath(color, getY) {
+    function drawFromBuffer(color, buf, offset = 0, windowSize = buf.length - offset) {
       const w = canvas.width, h = canvas.height;
-      const cycles = getCycles();
       ctx.fillStyle = '#111';
       ctx.fillRect(0, 0, w, h);
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      for (let i = 0; i <= w; i++) {
-        const angle = 2 * Math.PI * cycles * (i / w);
-        const y = getY(angle, h);
+      const step = windowSize / w;
+      for (let i = 0; i < w; i++) {
+        const sample = buf[offset + Math.floor(i * step)] / 128 - 1; // -1..1
+        const y = h / 2 + sample * (h / 2 - 12);
         i === 0 ? ctx.moveTo(i, y) : ctx.lineTo(i, y);
       }
       ctx.stroke();
     }
 
-    function getWaveY() { return waveType === 'square' ? squareY : sineY; }
-    function drawStatic() { tracePath('#333', getWaveY()); }
-    function drawScope()  {
+    function drawStatic() {
+      const w = canvas.width, h = canvas.height;
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, h / 2);
+      ctx.lineTo(w, h / 2);
+      ctx.stroke();
+    }
+
+    function drawScope() {
       animFrameId = requestAnimationFrame(drawScope);
-      tracePath('#7c3aed', getWaveY());
+      analyserNode.getByteTimeDomainData(analyserBuf);
+
+      // Find first rising zero-crossing to stabilize the display (trigger)
+      let triggerIdx = 0;
+      const searchLimit = analyserBuf.length / 2;
+      for (let i = 1; i < searchLimit; i++) {
+        if (analyserBuf[i - 1] < 128 && analyserBuf[i] >= 128) {
+          triggerIdx = i;
+          break;
+        }
+      }
+
+      // Fixed time window: 3 cycles at E4 (329.63 Hz), so higher notes show more cycles
+      const windowSize = Math.min(Math.round(3 * audioCtx.sampleRate / 329.63), analyserBuf.length - triggerIdx);
+
+      drawFromBuffer('#7c3aed', analyserBuf, triggerIdx, windowSize);
     }
 
     // ── Keyboard UI ──
