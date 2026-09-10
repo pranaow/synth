@@ -32,10 +32,32 @@
       border: 1px solid #2a2a2a;
       border-radius: 16px;
       padding: 2.5rem;
-      width: 380px;
+      width: 740px;
       display: flex;
       flex-direction: column;
       gap: 1.8rem;
+    }
+
+    .columns {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+    }
+
+    .col-left, .col-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1.8rem;
+    }
+
+    .col-left { padding-right: 1.8rem; }
+    .col-right { padding-left: 1.8rem; }
+
+    .col-divider {
+      width: 1px;
+      background: #2a2a2a;
+      align-self: stretch;
     }
 
     .field {
@@ -325,49 +347,73 @@
   <div class="card">
     <div class="freq-display" id="freqDisplay">440 <span>Hz</span></div>
 
-    <div class="field">
-      <label>Frequency</label>
-      <div class="freq-row">
-        <input type="range" id="freqSlider" min="20" max="2000" value="440" step="1">
-        <input type="number" id="freqInput" min="20" max="20000" value="440">
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Volume</label>
-      <div class="volume-row">
-        <input type="range" id="volSlider" min="0" max="100" value="50" step="1">
-        <span class="vol-label" id="volDisplay">50%</span>
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Wave Type</label>
-      <div class="wave-toggle">
-        <button id="btnSine" class="active">Sine</button>
-        <button id="btnSquare">Square</button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label class="section-label">Filter</label>
-      <div class="filter-grid">
-        <div class="filter-field">
-          <label>Cutoff</label>
-          <input type="range" id="cutoffSlider" min="20" max="20000" value="20000" step="1">
-          <span class="filter-val" id="cutoffDisplay">20000 Hz</span>
+    <div class="columns">
+      <div class="col-left">
+        <div class="field">
+          <label>Frequency</label>
+          <div class="freq-row">
+            <input type="range" id="freqSlider" min="20" max="2000" value="440" step="1">
+            <input type="number" id="freqInput" min="20" max="20000" value="440">
+          </div>
         </div>
-        <div class="filter-field">
-          <label>Resonance</label>
-          <input type="range" id="resonanceSlider" min="0.01" max="25" value="1" step="0.01">
-          <span class="filter-val" id="resonanceDisplay">1.00</span>
+
+        <div class="field">
+          <label>Volume</label>
+          <div class="volume-row">
+            <input type="range" id="volSlider" min="0" max="100" value="50" step="1">
+            <span class="vol-label" id="volDisplay">50%</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Wave Type</label>
+          <div class="wave-toggle">
+            <button id="btnSine" class="active">Sine</button>
+            <button id="btnSquare">Square</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-divider"></div>
+
+      <div class="col-right">
+        <div class="field">
+          <label class="section-label">Filter</label>
+          <div class="filter-grid">
+            <div class="filter-field">
+              <label>Cutoff</label>
+              <input type="range" id="cutoffSlider" min="20" max="20000" value="20000" step="1">
+              <span class="filter-val" id="cutoffDisplay">20000 Hz</span>
+            </div>
+            <div class="filter-field">
+              <label>Resonance</label>
+              <input type="range" id="resonanceSlider" min="0.01" max="25" value="1" step="0.01">
+              <span class="filter-val" id="resonanceDisplay">1.00</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="section-label">Envelope</label>
+          <div class="filter-grid">
+            <div class="filter-field">
+              <label>Attack</label>
+              <input type="range" id="attackSlider" min="0" max="5" value="0.01" step="0.01">
+              <span class="filter-val" id="attackDisplay">0.01 s</span>
+            </div>
+            <div class="filter-field">
+              <label>Decay</label>
+              <input type="range" id="decaySlider" min="0" max="5" value="0.1" step="0.01">
+              <span class="filter-val" id="decayDisplay">0.10 s</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="field">
       <label>Waveform</label>
-      <canvas id="scope" width="330" height="100"></canvas>
+      <canvas id="scope" width="690" height="100"></canvas>
     </div>
 
     <div class="controls">
@@ -450,16 +496,22 @@
     const btnSquare   = document.getElementById('btnSquare');
     const canvas          = document.getElementById('scope');
     const ctx             = canvas.getContext('2d');
-    const cutoffSlider    = document.getElementById('cutoffSlider');
-    const cutoffDisplay   = document.getElementById('cutoffDisplay');
-    const resonanceSlider = document.getElementById('resonanceSlider');
+    const cutoffSlider     = document.getElementById('cutoffSlider');
+    const cutoffDisplay    = document.getElementById('cutoffDisplay');
+    const resonanceSlider  = document.getElementById('resonanceSlider');
     const resonanceDisplay = document.getElementById('resonanceDisplay');
+    const attackSlider     = document.getElementById('attackSlider');
+    const attackDisplay    = document.getElementById('attackDisplay');
+    const decaySlider      = document.getElementById('decaySlider');
+    const decayDisplay     = document.getElementById('decayDisplay');
 
     // ── Helpers ──
     function getSliderFreq() { return parseFloat(freqInput.value) || 440; }
     function getVolume()     { return parseInt(volSlider.value) / 100; }
     function getCutoff()     { return parseFloat(cutoffSlider.value); }
     function getResonance()  { return parseFloat(resonanceSlider.value); }
+    function getAttack()     { return parseFloat(attackSlider.value); }
+    function getDecay()      { return parseFloat(decaySlider.value); }
     function shiftedFreq(note) { return note.freq * Math.pow(2, octaveShift); }
     function shiftedLabel(label) { return label.replace(/(\d+)$/, n => parseInt(n) + octaveShift); }
 
@@ -473,7 +525,13 @@
       if (audioCtx) return;
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       gainNode = audioCtx.createGain();
-      gainNode.gain.value = getVolume();
+      const vol = getVolume();
+      const attack = getAttack();
+      const decay = getDecay();
+      const now = audioCtx.currentTime;
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(vol, now + Math.max(attack, 0.001));
+      gainNode.gain.linearRampToValueAtTime(vol * 0.7, now + Math.max(attack, 0.001) + Math.max(decay, 0.001));
       filterNode = audioCtx.createBiquadFilter();
       filterNode.type = 'lowpass';
       filterNode.frequency.value = getCutoff();
@@ -568,6 +626,14 @@
     resonanceSlider.addEventListener('input', () => {
       resonanceDisplay.textContent = parseFloat(resonanceSlider.value).toFixed(2);
       if (filterNode) filterNode.Q.setTargetAtTime(getResonance(), audioCtx.currentTime, 0.01);
+    });
+
+    attackSlider.addEventListener('input', () => {
+      attackDisplay.textContent = parseFloat(attackSlider.value).toFixed(2) + ' s';
+    });
+
+    decaySlider.addEventListener('input', () => {
+      decayDisplay.textContent = parseFloat(decaySlider.value).toFixed(2) + ' s';
     });
 
     volSlider.addEventListener('input', () => {
