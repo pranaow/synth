@@ -345,15 +345,15 @@
   <h1>Tone Generator</h1>
 
   <div class="card">
-    <div class="freq-display" id="freqDisplay">440 <span>Hz</span></div>
+    <div class="freq-display" id="freqDisplay">523.3 <span>Hz</span></div>
 
     <div class="columns">
       <div class="col-left">
         <div class="field">
           <label>Frequency</label>
           <div class="freq-row">
-            <input type="range" id="freqSlider" min="20" max="2000" value="440" step="1">
-            <input type="number" id="freqInput" min="20" max="20000" value="440">
+            <input type="range" id="freqSlider" min="20" max="2000" value="523" step="1">
+            <input type="number" id="freqInput" min="20" max="20000" value="523.3">
           </div>
         </div>
 
@@ -480,7 +480,7 @@
     let playing    = false;
     let waveType   = 'square';
     let playButtonOn = false;
-    let currentFreq  = 440;
+    let currentFreq  = 523.3;
 
     const activeKeys = new Map(); // key char → note (preserves insertion order)
     let octaveShift = 0;
