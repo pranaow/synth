@@ -283,6 +283,40 @@
     }
 
     .octave-ticks span.active-tick { color: #7c3aed; font-weight: 700; }
+
+    .section-label {
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #7c3aed;
+      margin-bottom: 0.2rem;
+    }
+
+    .filter-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    .filter-field {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .filter-field label {
+      width: 72px;
+      flex-shrink: 0;
+    }
+
+    .filter-field input[type="range"] { flex: 1; }
+
+    .filter-val {
+      font-size: 0.8rem;
+      color: #aaa;
+      min-width: 62px;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -312,6 +346,22 @@
       <div class="wave-toggle">
         <button id="btnSine" class="active">Sine</button>
         <button id="btnSquare">Square</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="section-label">Filter</label>
+      <div class="filter-grid">
+        <div class="filter-field">
+          <label>Cutoff</label>
+          <input type="range" id="cutoffSlider" min="20" max="20000" value="20000" step="1">
+          <span class="filter-val" id="cutoffDisplay">20000 Hz</span>
+        </div>
+        <div class="filter-field">
+          <label>Resonance</label>
+          <input type="range" id="resonanceSlider" min="0.01" max="25" value="1" step="0.01">
+          <span class="filter-val" id="resonanceDisplay">1.00</span>
+        </div>
       </div>
     </div>
 
@@ -377,6 +427,7 @@
     let audioCtx    = null;
     let oscillator  = null;
     let gainNode    = null;
+    let filterNode  = null;
     let analyserNode = null;
     let analyserBuf  = null;
     let animFrameId = null;
@@ -397,12 +448,18 @@
     const playBtn     = document.getElementById('playBtn');
     const btnSine     = document.getElementById('btnSine');
     const btnSquare   = document.getElementById('btnSquare');
-    const canvas      = document.getElementById('scope');
-    const ctx         = canvas.getContext('2d');
+    const canvas          = document.getElementById('scope');
+    const ctx             = canvas.getContext('2d');
+    const cutoffSlider    = document.getElementById('cutoffSlider');
+    const cutoffDisplay   = document.getElementById('cutoffDisplay');
+    const resonanceSlider = document.getElementById('resonanceSlider');
+    const resonanceDisplay = document.getElementById('resonanceDisplay');
 
     // ── Helpers ──
     function getSliderFreq() { return parseFloat(freqInput.value) || 440; }
     function getVolume()     { return parseInt(volSlider.value) / 100; }
+    function getCutoff()     { return parseFloat(cutoffSlider.value); }
+    function getResonance()  { return parseFloat(resonanceSlider.value); }
     function shiftedFreq(note) { return note.freq * Math.pow(2, octaveShift); }
     function shiftedLabel(label) { return label.replace(/(\d+)$/, n => parseInt(n) + octaveShift); }
 
@@ -417,10 +474,15 @@
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       gainNode = audioCtx.createGain();
       gainNode.gain.value = getVolume();
+      filterNode = audioCtx.createBiquadFilter();
+      filterNode.type = 'lowpass';
+      filterNode.frequency.value = getCutoff();
+      filterNode.Q.value = getResonance();
       analyserNode = audioCtx.createAnalyser();
       analyserNode.fftSize = 8192;
       analyserBuf = new Uint8Array(analyserNode.fftSize);
-      gainNode.connect(analyserNode);
+      gainNode.connect(filterNode);
+      filterNode.connect(analyserNode);
       analyserNode.connect(audioCtx.destination);
       oscillator = audioCtx.createOscillator();
       oscillator.type = waveType;
@@ -435,10 +497,12 @@
       oscillator.stop();
       oscillator.disconnect();
       gainNode.disconnect();
+      filterNode.disconnect();
       analyserNode.disconnect();
       audioCtx.close();
       oscillator   = null;
       gainNode     = null;
+      filterNode   = null;
       analyserNode = null;
       analyserBuf  = null;
       audioCtx     = null;
@@ -493,6 +557,17 @@
       updateFreqDisplay(val);
       if (playButtonOn && activeKeys.size === 0) setOscFreq(getSliderFreq());
       if (!playing) drawStatic();
+    });
+
+    cutoffSlider.addEventListener('input', () => {
+      const val = getCutoff();
+      cutoffDisplay.textContent = val >= 1000 ? `${(val / 1000).toFixed(1)} kHz` : `${Math.round(val)} Hz`;
+      if (filterNode) filterNode.frequency.setTargetAtTime(val, audioCtx.currentTime, 0.01);
+    });
+
+    resonanceSlider.addEventListener('input', () => {
+      resonanceDisplay.textContent = parseFloat(resonanceSlider.value).toFixed(2);
+      if (filterNode) filterNode.Q.setTargetAtTime(getResonance(), audioCtx.currentTime, 0.01);
     });
 
     volSlider.addEventListener('input', () => {
